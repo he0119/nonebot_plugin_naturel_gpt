@@ -1,17 +1,21 @@
-﻿from typing import Any, Dict, List
-from nonebot.config import Config as NBConfig
-from pydantic import BaseModel, Extra
-from nonebot import get_driver
-from .logger import logger
-import yaml
-from pathlib import Path
+﻿from pathlib import Path
+from typing import Any, Dict, List
 
-class GlobalConfig(NBConfig, extra=Extra.ignore):
+import yaml
+from nonebot import get_plugin_config
+from nonebot.compat import type_validate_python
+from nonebot.config import Config as NBConfig
+from pydantic import BaseModel
+
+from .logger import logger
+
+
+class GlobalConfig(NBConfig):
     """Plugin Config Here"""
     ng_config_path: str = "config/naturel_gpt_config.yml"
     ng_dev_mode: bool = False
 
-class PresetConfig(BaseModel, extra=Extra.ignore):
+class PresetConfig(BaseModel):
     """人格预设配置项"""
     preset_key:str
     is_locked:bool = False
@@ -20,13 +24,13 @@ class PresetConfig(BaseModel, extra=Extra.ignore):
     """此预设是否仅限私聊"""
     bot_self_introl:str = ''
 
-class ExtConfig(BaseModel, extra=Extra.ignore):
+class ExtConfig(BaseModel):
     """扩展配置项"""
     EXT_NAME:str
     IS_ACTIVE:bool
     EXT_CONFIG:Any
 
-class Config(BaseModel, extra=Extra.ignore):
+class Config(BaseModel):
     """ng 配置数据，默认保存为 naturel_gpt_config.yml"""
     OPENAI_API_KEYS: List[str]
     """OpenAI API Key 列表"""
@@ -293,8 +297,7 @@ CONFIG_TEMPLATE = {
     'DEBUG_LEVEL': 0,  # debug level, [0, 1, 2], 0 为关闭，等级越高debug信息越详细
 }
 
-driver = get_driver()
-global_config = GlobalConfig.parse_obj(driver.config)
+global_config = get_plugin_config(GlobalConfig)
 config_path = global_config.ng_config_path
 config:Config = None # type: ignore
 
@@ -319,11 +322,11 @@ def _load_config_obj_from_file()->Config:
             raise e
         
         for k in CONFIG_TEMPLATE.keys():
-            if not k in config_obj_from_file.keys():
+            if k not in config_obj_from_file.keys():
                 config_obj_from_file[k] = CONFIG_TEMPLATE[k]
                 logger.info(f"Naturel GPT 配置文件缺少 {k} 项，将使用默认值")
 
-        config_obj = Config.parse_obj(config_obj_from_file)
+        config_obj = type_validate_python(Config, config_obj_from_file)
     return config_obj
 
 def save_config():
